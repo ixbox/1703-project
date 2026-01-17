@@ -17,7 +17,7 @@
 
 ## Documentation
 
-詳細は[docs/project-overview.md](docs/project-overview.md)を参照
+詳細は[docs/README.md](docs/README.md)を参照
 
 ## Hardware
 
