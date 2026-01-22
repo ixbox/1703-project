@@ -1,5 +1,37 @@
 # ハードウェア詳細
 
+## Arduino ピンアサイン
+
+### デジタルピン
+
+| ピン | 機能 | 備考 |
+|------|------|------|
+| D0 | RX (UART) | 予約（Phase 2用） |
+| D1 | TX (UART) | 予約（Phase 2用） |
+| D2 | LCD_RS | キャラクタLCD Register Select |
+| D3 | LCD_EN | キャラクタLCD Enable |
+| D4 | LCD_D4 | キャラクタLCD Data 4 |
+| D5 | LCD_D5 | キャラクタLCD Data 5 |
+| D6 | LCD_D6 | キャラクタLCD Data 6 |
+| D7 | LCD_D7 | キャラクタLCD Data 7 |
+| D8 | 空き | - |
+| D9 | RPWM | BTS7960, Timer1 OCR1A |
+| D10 | LPWM | BTS7960, Timer1 OCR1B |
+| D11 | R_EN | BTS7960 Right Enable |
+| D12 | L_EN | BTS7960 Left Enable |
+| D13 | 空き | LED_BUILTIN |
+
+### アナログピン
+
+| ピン | 機能 | 備考 |
+|------|------|------|
+| A0 | R_IS | BTS7960 Right Current Sense |
+| A1 | L_IS | BTS7960 Left Current Sense |
+| A2 | ACS758 VIOUT | 電流センサ出力（Phase 2用） |
+| A3 | 空き | - |
+| A4 | SDA | I²C（Phase 2用） |
+| A5 | SCL | I²C（Phase 2用） |
+
 ## モータードライバ: BTS7960
 
 ### 仕様
@@ -15,12 +47,12 @@
 ```
 BTS7960          Arduino UNO R3/Nano
 ----------------------------------------
-RPWM       →     D9 (Timer1 PWM)
-LPWM       →     D10 (Timer1 PWM)
-R_EN       →     D7 (Digital Out)
-L_EN       →     D8 (Digital Out)
-R_IS       →     A0 (Analog In)
-L_IS       →     A1 (Analog In)
+RPWM       →     D9  (Timer1 PWM, OCR1A)
+LPWM       →     D10 (Timer1 PWM, OCR1B)
+R_EN       →     D11 (Digital Out)
+L_EN       →     D12 (Digital Out)
+R_IS       →     A0  (Analog In)
+L_IS       →     A1  (Analog In)
 VCC        →     5V
 GND        →     GND
 B+         →     7.2V (Battery+)
