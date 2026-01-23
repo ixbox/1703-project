@@ -6,8 +6,8 @@
 
 | ピン | 機能 | 備考 |
 |------|------|------|
-| D0 | RX (UART) | 予約（Phase 2用） |
-| D1 | TX (UART) | 予約（Phase 2用） |
+| D0 | RX (UART) | デバッグ用シリアル通信 / Phase 2でのMCU間通信 |
+| D1 | TX (UART) | デバッグ用シリアル通信 / Phase 2でのMCU間通信 |
 | D2 | LCD_RS | キャラクタLCD Register Select |
 | D3 | LCD_EN | キャラクタLCD Enable |
 | D4 | LCD_D4 | キャラクタLCD Data 4 |

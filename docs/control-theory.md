@@ -29,8 +29,8 @@ void setup() {
 // ピン定義
 #define RPWM_PIN 9
 #define LPWM_PIN 10
-#define R_EN_PIN 7
-#define L_EN_PIN 8
+#define R_EN_PIN 11
+#define L_EN_PIN 12
 
 void setup() {
   // Timer1を10kHz PWMに設定
