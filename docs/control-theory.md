@@ -14,9 +14,9 @@ void setup() {
   TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10); // プリスケーラなし
   
-  // TOP値設定（16MHz / 10kHz = 1600）
-  ICR1 = 1600;
-  
+  // TOP値設定: Fpwm = Fclk / (TOP + 1) → TOP = 16MHz / 10kHz - 1 = 1599
+  ICR1 = 1599;
+
   // 初期duty 0%
   OCR1A = 0; // D9 (RPWM)
   OCR1B = 0; // D10 (LPWM)
@@ -36,52 +36,43 @@ void setup() {
   // Timer1を10kHz PWMに設定
   TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10);
-  ICR1 = 1600;
+  ICR1 = 1599;
   OCR1A = 0;
   OCR1B = 0;
-  
-  // EN端子の初期化
+
+  // EN端子の初期化（両方HIGH固定、方向はRPWM/LPWMで制御）
   pinMode(R_EN_PIN, OUTPUT);
   pinMode(L_EN_PIN, OUTPUT);
-  digitalWrite(R_EN_PIN, LOW);
-  digitalWrite(L_EN_PIN, LOW);
-}
-
-// 前進
-void forward(uint8_t speed) {  // speed: 0-255
-  uint16_t duty = map(speed, 0, 255, 0, 1600);
-  
-  // 方向設定
   digitalWrite(R_EN_PIN, HIGH);
-  digitalWrite(L_EN_PIN, LOW);
-  
-  // PWM設定
-  OCR1A = duty;   // RPWM
-  OCR1B = 0;      // LPWM
-}
-
-// 後退
-void backward(uint8_t speed) {
-  uint16_t duty = map(speed, 0, 255, 0, 1600);
-  
-  // 方向設定
-  digitalWrite(R_EN_PIN, LOW);
   digitalWrite(L_EN_PIN, HIGH);
-  
-  // PWM設定
-  OCR1A = 0;      // RPWM
-  OCR1B = duty;   // LPWM
 }
 
-// 停止
+// 前進: RPWMにPWM、LPWM=0
+void forward(uint8_t speed) {  // speed: 0-255
+  uint16_t duty = constrain(map(speed, 0, 255, 0, ICR1), 0, ICR1);
+  OCR1A = duty; // RPWM
+  OCR1B = 0;    // LPWM
+}
+
+// 後退: RPWM=0、LPWMにPWM
+void backward(uint8_t speed) {
+  uint16_t duty = constrain(map(speed, 0, 255, 0, ICR1), 0, ICR1);
+  OCR1A = 0;    // RPWM
+  OCR1B = duty; // LPWM
+}
+
+// 停止（コースト: 両PWM=0、EN維持）
 void stop() {
-  // EN端子をLOWにしてハードウェア的に切断
-  digitalWrite(R_EN_PIN, LOW);
-  digitalWrite(L_EN_PIN, LOW);
-  
-  // PWMも0に
   OCR1A = 0;
   OCR1B = 0;
+}
+
+// 緊急停止（EN=LOWでハードウェア的にモーター回路を遮断）
+void emergencyStop() {
+  OCR1A = 0;
+  OCR1B = 0;
+  digitalWrite(R_EN_PIN, LOW);
+  digitalWrite(L_EN_PIN, LOW);
 }
 ```
 
@@ -171,7 +162,8 @@ void loop() {
 
 ### 実装時の検討事項
 - `STOP_WAIT_TIME`は実機で測定（PWM=0から完全停止までの時間）
-- 電流値による停止確認も検討（電流が閾値以下になるまで待つ）
+- 電流値（R_IS/L_IS）による停止確認を推奨（電流が閾値以下で停止判定とする方が再現性が高い）
+- もしくは「PWM=0 → 数msデッドタイム → 切替」で十分か実機で検証
 - 連続した方向転換コマンドのデバウンス処理
 
 ## 通信プロトコル
@@ -194,39 +186,42 @@ M     → ステータス送信
 
 **実装例**:
 ```cpp
+// 行バッファによる非同期パース（制御ループをブロックしない）
+char cmdBuf[16];
+uint8_t cmdLen = 0;
+
 void setup() {
   Serial.begin(9600);  // ノイズ耐性のため低速スタート
   // PWM, BTS7960の初期化
 }
 
 void loop() {
-  if(Serial.available() > 0) {
-    char cmd = Serial.read();
-    
-    switch(cmd) {
-      case 'F': // 前進
-        if(Serial.available() > 0) {
-          uint8_t speed = Serial.parseInt();
-          requestForward(speed);
-        }
-        break;
-        
-      case 'B': // 後退
-        if(Serial.available() > 0) {
-          uint8_t speed = Serial.parseInt();
-          requestBackward(speed);
-        }
-        break;
-        
-      case 'S': // 停止
-        stop();
-        currentState = STOPPED;
-        break;
-        
-      case 'M': // モニタリング要求
-        sendStatus();
-        break;
+  updateMotorState();
+
+  // 1文字ずつ読み取り、改行で処理（ノンブロッキング）
+  while(Serial.available() > 0) {
+    char c = Serial.read();
+    if(c == '\n' || c == '\r') {
+      if(cmdLen > 0) {
+        cmdBuf[cmdLen] = '\0';
+        processCommand(cmdBuf);
+        cmdLen = 0;
+      }
+    } else if(cmdLen < sizeof(cmdBuf) - 1) {
+      cmdBuf[cmdLen++] = c;
     }
+  }
+}
+
+void processCommand(const char* buf) {
+  char cmd = buf[0];
+  uint8_t speed = (buf[1] != '\0') ? atoi(&buf[1]) : 0;
+
+  switch(cmd) {
+    case 'F': requestForward(speed); break;
+    case 'B': requestBackward(speed); break;
+    case 'S': stop(); currentState = STOPPED; break;
+    case 'M': sendStatus(); break;
   }
 }
 
